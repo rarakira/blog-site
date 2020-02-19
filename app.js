@@ -12,7 +12,7 @@ const defaultPosts = {
   content: "This is a very entertaining text!"
 };
 
-const posts = [defaultPosts];
+const posts = [];
 
 app.set('view engine', 'ejs');
 
@@ -21,6 +21,23 @@ app.use(express.static("public"));
 
 app.get("/", (req, res) => {
   res.render("home", {contentHome: contentHome, contentPosts: posts});
+});
+
+app.get("/posts/:postName", (req, res) => {
+  const postTitle = req.params.postName;
+  let postExists = false;
+  posts.forEach(post => {
+    if (post.title === postTitle) {
+      res.render("post", {post: post});
+      postExists = !postExists;
+    };
+  });
+  if (!postExists) {
+    res.render("post", {post: {
+      title: "404",
+      content: "Page not found"
+    }});
+  }
 });
 
 app.get("/contact", (req, res) => {
