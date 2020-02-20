@@ -1,6 +1,8 @@
 const express = require("express");
 const ejs = require("ejs");
+const mongoose = require("mongoose");
 const _ = require("lodash");
+const dotenv = require("dotenv").config();
 
 const contentHome = "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
 const contentAbout = "Hac habitasse platea dictumst vestibulum rhoncus est pellentesque. Dictumst vestibulum rhoncus est pellentesque elit ullamcorper. Non diam phasellus vestibulum lorem sed. Platea dictumst quisque sagittis purus sit. Egestas sed sed risus pretium quam vulputate dignissim suspendisse. Mauris in aliquam sem fringilla. Semper risus in hendrerit gravida rutrum quisque non tellus orci. Amet massa vitae tortor condimentum lacinia quis vel eros. Enim ut tellus elementum sagittis vitae. Mauris ultrices eros in cursus turpis massa tincidunt dui.";
@@ -8,37 +10,69 @@ const contentContact = "Scelerisque eleifend donec pretium vulputate sapien. Rho
 
 const app = express();
 
-const defaultPosts = {
-  title: "First post",
-  content: "This is a very entertaining text!"
-};
-
-const posts = [];
-
 app.set('view engine', 'ejs');
 
 app.use(express.urlencoded({extended: true}));
 app.use(express.static("public"));
 
-app.get("/", (req, res) => {
-  res.render("home", {contentHome: contentHome, contentPosts: posts});
+mongoose.connect(`mongodb+srv://${process.env.NAME}:${process.env.PASS}@cluster0-xh2y4.gcp.mongodb.net/blogTestDB`, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  useFindAndModify: false
 });
 
-app.get("/posts/:postName", (req, res) => {
-  const postTitle = req.params.postName;
-  let postExists = false;
-  posts.forEach(post => {
-    if (_.kebabCase(post.title) === _.kebabCase(postTitle)) {
-      res.render("post", {post: post});
-      postExists = !postExists;
-    };
+const postSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, "Please, add a Title!"]
+  },
+  content: String
+});
+
+const Post = mongoose.model("Post", postSchema);
+
+app.get("/", (req, res) => {
+
+  Post.find({}, (err, foundPosts) => {
+
+    if (err) {
+      console.log(err);
+    } else {
+
+      if (foundPosts.length === 0) {
+        const defaultPost = new Post ({
+          title: "First post",
+          content: "Nunc vel dui enim. Aliquam ac auctor neque. Nam nec vulputate velit. Vivamus scelerisque orci non risus gravida tempor ac eget diam. Integer ante velit, eleifend ac odio vel, posuere posuere risus. Duis auctor accumsan pulvinar. In eu ullamcorper felis. Morbi sed sem eu justo tempus dictum vel et purus. Morbi ipsum velit, viverra nec justo nec, ultrices porta ligula."
+        });
+        defaultPost.save(err => {
+          if (!err) {
+            res.redirect("/");
+          }
+        });
+
+      } else {
+        res.render("home", {contentHome: contentHome, contentPosts: foundPosts});
+      }
+
+    }
+
   });
-  if (!postExists) {
-    res.render("post", {post: {
-      title: "404",
-      content: "Page not found"
-    }});
-  }
+});
+
+app.get("/posts/:_id", (req, res) => {
+  const postId = req.params._id;
+
+  Post.findById(postId, (err, post) => {
+    if (err) {
+      res.render("post", {post: {
+        title: 404,
+        content: "Post not found"
+      }});
+    } else {
+      res.render("post", {post: post});
+    }
+  });
+
 });
 
 app.get("/contact", (req, res) => {
@@ -54,12 +88,17 @@ app.get("/compose", (req, res) => {
 });
 
 app.post("/compose", (req, res) => {
-  const newPost = {
+
+  const newPost = new Post ({
     title: req.body.postTitle,
     content: req.body.postContent
-  };
-  posts.push(newPost);
-  res.redirect("/");
+  });
+
+  newPost.save(err => {
+    if (!err) {
+      res.redirect("/");
+    }
+  });
 });
 
 app.listen(3000, function() {
